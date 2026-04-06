@@ -56,7 +56,7 @@
 </div>
 
 <footer>
-    <p>IF Baiano - DICOM | <strong>Versão: 1.5 (Final Patch)</strong></p>
+    <p>IF Baiano - DICOM | <strong>Versão: 1.7 (Protocol Fix)</strong></p>
 </footer>
 
 <script>
@@ -84,29 +84,26 @@
             return;
         }
 
-        exibirStatus("⏳ Consultando nuvem Cloudflare...", "loading");
+        exibirStatus("⏳ Consultando via Worker (Protocol V1.7)...", "loading");
         tabelaContainer.style.display = "none";
         corpoTabela.innerHTML = "";
 
         try {
             const response = await fetch(`${workerUrlBase}?cnpj=${cnpjLimpo}`);
-            
-            // Se for 400, o problema é a montagem da URL ou parâmetro
-            if (response.status === 400) {
-                throw new Error("Erro 400: Requisição malformada. Verifique o CNPJ.");
-            }
-            if (response.status === 401) {
-                throw new Error("Erro 401: Chave de API inválida no Worker.");
-            }
-
             const dados = await response.json();
 
+            if (!response.ok) {
+                // Tenta extrair a mensagem de erro específica do Portal
+                let msg = dados.message || dados.error || `Erro ${response.status}`;
+                throw new Error(msg);
+            }
+
             if (!Array.isArray(dados)) {
-                throw new Error(dados.message || dados.error || "A API retornou um formato inesperado.");
+                throw new Error("Formato de lista não recebido.");
             }
 
             if (dados.length === 0) {
-                exibirStatus("ℹ️ Nenhum empenho encontrado para este CNPJ.", "loading");
+                exibirStatus("ℹ️ Nenhum empenho encontrado (2025-2026).", "loading");
                 return;
             }
 
@@ -128,8 +125,8 @@
             tabelaContainer.style.display = "block";
 
         } catch (err) {
-            exibirStatus(`❌ Erro: ${err.message}`, "error");
-            console.error("Detalhes do erro:", err);
+            exibirStatus(`❌ Detalhes: ${err.message}`, "error");
+            console.error("Debug:", err);
         }
     }
 
