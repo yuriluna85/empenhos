@@ -15,7 +15,6 @@
         input:focus { border-color: var(--verde-if); outline: none; box-shadow: 0 0 8px rgba(39, 174, 96, 0.2); }
         button { background: var(--verde-if); color: white; padding: 14px; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; transition: 0.3s; }
         button:hover { background: #219150; transform: translateY(-1px); }
-        button:active { transform: translateY(0); }
         #status-box { margin-top: 20px; padding: 15px; border-radius: 8px; display: none; font-weight: 500; text-align: center; }
         .loading { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
         .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
@@ -35,7 +34,6 @@
     <div class="input-group">
         <label for="cnpjInput">CNPJ do Fornecedor:</label>
         <input type="text" id="cnpjInput" placeholder="00.000.000/0000-00" maxlength="18">
-        <p style="font-size: 0.8em; color: #777; margin-top: 5px;">A consulta será realizada via Cloudflare Worker (Serverless).</p>
     </div>
 
     <button onclick="buscarDados()">Realizar Consulta</button>
@@ -58,24 +56,21 @@
 </div>
 
 <footer>
-    <p>IF Baiano - DICOM | <strong>Versão: 1.2 (Serverless Cloudflare)</strong></p>
+    <p>IF Baiano - DICOM | <strong>Versão: 1.3 (Array Defense)</strong></p>
 </footer>
 
 <script>
     const cnpjInput = document.getElementById('cnpjInput');
+    // Link do seu Worker no Cloudflare
     const workerUrlBase = 'https://sparkling-flower-ab8c.luna-yuri0.workers.dev/';
 
-    // Máscara de CNPJ em tempo real
     cnpjInput.addEventListener('input', (e) => {
         let v = e.target.value.replace(/\D/g, '');
         if (v.length > 14) v = v.slice(0, 14);
-        
-        // Aplicação da máscara 00.000.000/0000-00
         v = v.replace(/^(\d{2})(\d)/, '$1.$2');
         v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
         v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
         v = v.replace(/(\d{4})(\d)/, '$1-$2');
-        
         e.target.value = v;
     });
 
@@ -85,55 +80,56 @@
         const tabelaContainer = document.getElementById('tabela-container');
         const corpoTabela = document.getElementById('corpoTabela');
 
-        // Validação básica
         if (cnpjLimpo.length < 14) {
-            exibirStatus("⚠️ Por favor, insira um CNPJ válido com 14 dígitos.", "error");
+            exibirStatus("⚠️ CNPJ incompleto.", "error");
             return;
         }
 
-        // Reset de interface
-        exibirStatus("⏳ Consultando nuvem Cloudflare... Aguarde.", "loading");
+        exibirStatus("⏳ Consultando nuvem Cloudflare...", "loading");
         tabelaContainer.style.display = "none";
         corpoTabela.innerHTML = "";
 
         try {
-            // Chamada ao seu Worker passando o CNPJ limpo como parâmetro
             const response = await fetch(`${workerUrlBase}?cnpj=${cnpjLimpo}`);
-
+            
             if (!response.ok) {
-                const erroTexto = await response.text();
-                throw new Error(erroTexto || `Erro ${response.status} no servidor.`);
+                throw new Error(`Servidor respondeu com erro ${response.status}`);
             }
 
             const dados = await response.json();
 
-            if (!dados || dados.length === 0) {
-                exibirStatus("ℹ️ Nenhum empenho encontrado para este fornecedor.", "loading");
+            // SEGURANÇA: Verifica se 'dados' é realmente uma Array/Lista
+            if (!Array.isArray(dados)) {
+                console.error("Resposta da API não é uma lista:", dados);
+                // Se a API retornar um objeto de erro, tentamos mostrar a mensagem dele
+                const msgErro = dados.message || "A API retornou um formato inesperado.";
+                throw new Error(msgErro);
+            }
+
+            if (dados.length === 0) {
+                exibirStatus("ℹ️ Nenhum empenho encontrado para este CNPJ.", "loading");
                 return;
             }
 
-            // Preenchimento da tabela
             dados.forEach(item => {
                 const valorFormatado = parseFloat(item.valor).toLocaleString('pt-BR', { 
                     style: 'currency', 
                     currency: 'BRL' 
                 });
                 
-                const linha = `<tr>
+                corpoTabela.innerHTML += `<tr>
                     <td>${item.dataEmissao}</td>
                     <td>${item.documento}</td>
-                    <td>${item.orgaoSuperior.nome}</td>
+                    <td>${item.orgaoSuperior ? item.orgaoSuperior.nome : 'N/A'}</td>
                     <td>${valorFormatado}</td>
                 </tr>`;
-                corpoTabela.innerHTML += linha;
             });
 
-            // Sucesso
             statusBox.style.display = "none";
             tabelaContainer.style.display = "block";
 
         } catch (err) {
-            exibirStatus(`❌ Erro na consulta: ${err.message}`, "error");
+            exibirStatus(`❌ Erro: ${err.message}`, "error");
             console.error("Detalhes do erro:", err);
         }
     }
