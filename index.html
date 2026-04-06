@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta Empenhos - DICOM IF Baiano</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+        h2 { color: #1a5c37; border-bottom: 3px solid #27ae60; padding-bottom: 10px; margin-bottom: 25px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; }
+        input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box; transition: border-color 0.3s; }
+        input:focus { border-color: #27ae60; outline: none; }
+        button { background-color: #27ae60; color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin-top: 10px; }
+        button:hover { background-color: #219150; }
+        .info { font-size: 0.85em; color: #666; margin-top: 5px; }
+        #status { margin-top: 20px; padding: 15px; border-radius: 6px; display: none; }
+        .loading { background-color: #e3f2fd; color: #0d47a1; display: block !important; }
+        .error { background-color: #ffebee; color: #c62828; display: block !important; }
+        table { width: 100%; border-collapse: collapse; margin-top: 25px; display: none; }
+        th, td { padding: 12px; border: 1px solid #eee; text-align: left; font-size: 14px; }
+        th { background-color: #27ae60; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🔎 Localizador de Empenhos por Fornecedor</h2>
+    
+    <div class="form-group">
+        <label>Sua API Key (Portal da Transparência):</label>
+        <input type="password" id="apiKey" placeholder="Cole sua chave aqui...">
+    </div>
+
+    <div class="form-group">
+        <label>CNPJ do Fornecedor:</label>
+        <input type="text" id="cnpjInput" placeholder="00.000.000/0000-00" maxlength="18">
+        <p class="info">Dica: A máscara é automática. O sistema enviará apenas os números para o Portal.</p>
+    </div>
+
+    <button onclick="consultarPortal()">Consultar Empenhos</button>
+
+    <div id="status"></div>
+
+    <table id="tabelaDados">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Número Empenho</th>
+                <th>Órgão Solicitante</th>
+                <th>Valor (R$)</th>
+            </tr>
+        </thead>
+        <tbody id="corpoTabela"></tbody>
+    </table>
+</div>
+
+<script>
+    // 1. Máscara Automática de CNPJ
+    const inputCnpj = document.getElementById('cnpjInput');
+    inputCnpj.addEventListener('input', (e) => {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.length > 14) value = value.slice(0, 14);
+        
+        value = value.replace(/^(\d{2})(\d)/, '$1.$2');
+        value = value.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$3.$3');
+        value = value.replace(/\.(\d{3})(\d)/, '.$1/$2');
+        value = value.replace(/(\d{4})(\d)/, '$1-$2');
+        
+        e.target.value = value;
+    });
+
+    async function consultarPortal() {
+        const rawCnpj = inputCnpj.value.replace(/\D/g, ''); // Limpa tudo, deixa só NÚMEROS
+        const key = document.getElementById('apiKey').value;
+        const status = document.getElementById('status');
+        const tabela = document.getElementById('tabelaDados');
+        const corpo = document.getElementById('corpoTabela');
+
+        if (!key) return mostrarStatus("Erro: Por favor, insira sua API Key.", "error");
+        if (rawCnpj.length !== 14) return mostrarStatus("Erro: CNPJ incompleto.", "error");
+
+        mostrarStatus("⏳ Conectando ao Portal da Transparência...", "loading");
+        tabela.style.display = "none";
+        corpo.innerHTML = "";
+
+        // Usando o Proxy CORS para rodar direto do seu navegador local
+        const proxy = 'https://cors-anywhere.herokuapp.com/';
+        const url = `https://api.portaldatransparencia.gov.br/api-de-dados/despesas/documentos-por-favorecido?codigoBeneficiario=${rawCnpj}&pagina=1`;
+
+        try {
+            const response = await fetch(proxy + url, {
+                method: 'GET',
+                headers: {
+                    'chave-api-dados': key,
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (response.status === 401) throw new Error("Chave API Inválida ou expirada.");
+            if (!response.ok) throw new Error("Erro na comunicação com o Portal.");
+
+            const dados = await response.json();
+
+            if (dados.length === 0) {
+                mostrarStatus("ℹ️ Nenhum empenho encontrado para este CNPJ no período atual.", "loading");
+                return;
+            }
+
+            dados.forEach(item => {
+                const valorFormatado = parseFloat(item.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                const row = `<tr>
+                    <td>${item.dataEmissao}</td>
+                    <td>${item.documento}</td>
+                    <td>${item.orgaoSuperior.nome}</td>
+                    <td>${valorFormatado}</td>
+                </tr>`;
+                corpo.innerHTML += row;
+            });
+
+            status.style.display = "none";
+            tabela.style.display = "table";
+
+        } catch (err) {
+            mostrarStatus(`⚠️ ${err.message} <br><br> <small>Se for erro de CORS, acesse <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank">este link</a> e clique no botão para liberar o acesso temporário.</small>`, "error");
+        }
+    }
+
+    function mostrarStatus(msg, tipo) {
+        const status = document.getElementById('status');
+        status.innerHTML = msg;
+        status.className = tipo;
+        status.style.display = "block";
+    }
+</script>
+
+</body>
+</html>
