@@ -24,7 +24,7 @@
             border-radius: 20px; 
             box-shadow: 0 15px 35px rgba(0,0,0,0.1); 
             text-align: center; 
-            border-bottom: 10px solid var(--verde-if); 
+            border-top: 10px solid var(--verde-if); 
         }
         h2 { color: var(--dark); margin-top: 0; font-size: 1.5em; }
         p { color: #666; font-size: 0.95em; margin-bottom: 30px; }
@@ -63,7 +63,15 @@
             gap: 10px;
         }
         .btn:hover { background: #219150; transform: translateY(-3px); box-shadow: 0 8px 20px rgba(39, 174, 96, 0.3); }
-        .btn:active { transform: translateY(0); }
+        
+        .info-data {
+            margin-top: 15px;
+            font-size: 0.85em;
+            color: #888;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 8px;
+        }
 
         .footer { margin-top: 40px; color: #999; font-size: 0.8em; text-align: center; }
     </style>
@@ -71,9 +79,9 @@
 <body>
 
 <div class="card">
-    <div style="font-size: 50px; margin-bottom: 10px;">🔍</div>
+    <div style="font-size: 50px; margin-bottom: 10px;">📊</div>
     <h2>Consulta de Empenhos</h2>
-    <p>Acesse os dados oficiais do Portal da Transparência para o fornecedor desejado.</p>
+    <p>Acesse os dados oficiais filtrados pelo último ano de exercício.</p>
     
     <div class="input-group">
         <label>CNPJ do Fornecedor:</label>
@@ -84,16 +92,39 @@
         <span>Acessar Portal Oficial</span>
         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
     </button>
+
+    <div class="info-data" id="periodoInfo">
+        </div>
 </div>
 
 <div class="footer">
-    IF Baiano - DICOM | <strong>Versão: 2.1 (URL Direct Engine)</strong>
+    IF Baiano - DICOM | <strong>Versão: 2.2 (Dynamic Date Engine)</strong>
 </div>
 
 <script>
     const cnpjInput = document.getElementById('cnpjInput');
+    const infoData = document.getElementById('periodoInfo');
 
-    // Máscara CNPJ (Apenas visual para o usuário)
+    // Cálculo das datas (Hoje e 1 ano atrás)
+    const hoje = new Date();
+    const umAnoAtras = new Date();
+    umAnoAtras.setFullYear(hoje.getFullYear() - 1);
+
+    // Formatação para exibição e URL (DD/MM/AAAA)
+    const formatarData = (d) => {
+        const dia = String(d.getDate()).padStart(2, '0');
+        const mes = String(d.getMonth() + 1).padStart(2, '0');
+        const ano = d.getFullYear();
+        return `${dia}/${mes}/${ano}`;
+    };
+
+    const dataFinalStr = formatarData(hoje);
+    const dataInicialStr = formatarData(umAnoAtras);
+
+    // Mostra ao usuário qual período será consultado
+    infoData.innerHTML = `📅 Período: <strong>${dataInicialStr}</strong> até <strong>${dataFinalStr}</strong>`;
+
+    // Máscara CNPJ
     cnpjInput.addEventListener('input', (e) => {
         let v = e.target.value.replace(/\D/g, '');
         if (v.length > 14) v = v.slice(0, 14);
@@ -108,17 +139,18 @@
         const cnpjFormatado = cnpjInput.value;
 
         if (cnpjFormatado.length < 18) {
-            alert("⚠️ Por favor, digite o CNPJ completo com 14 dígitos.");
+            alert("⚠️ Digite o CNPJ completo.");
             return;
         }
 
-        // Encodamos o CNPJ (Ex: 34.239.740/0001-05 vira 34.239.740%2F0001-05)
+        // Encodamos os valores para a URL
         const cnpjEncoded = encodeURIComponent(cnpjFormatado);
+        const dInicialEncoded = encodeURIComponent(dataInicialStr);
+        const dFinalEncoded = encodeURIComponent(dataFinalStr);
 
-        // Link Final baseado na estrutura real que você validou
-        const urlFinal = `https://portaldatransparencia.gov.br/despesas/recursos-recebidos?paginacaoSimples=true&tamanhoPagina=&offset=&direcaoOrdenacao=asc&cpfCnpj=${cnpjEncoded}&colunasSelecionadas=linkDetalhamento%2CmesAno%2Cfavorecido%2CtipoFavorecido%2CufFavorecido%2CmunicipioFavorecido%2CvalorRecebido`;
+        // URL Final com filtros de CNPJ e Data
+        const urlFinal = `https://portaldatransparencia.gov.br/despesas/recursos-recebidos?paginacaoSimples=true&tamanhoPagina=&offset=&direcaoOrdenacao=asc&cpfCnpj=${cnpjEncoded}&dataInicial=${dInicialEncoded}&dataFinal=${dFinalEncoded}&colunasSelecionadas=linkDetalhamento%2CmesAno%2Cfavorecido%2CtipoFavorecido%2CufFavorecido%2CmunicipioFavorecido%2CvalorRecebido`;
 
-        // Abre o Portal da Transparência em uma nova aba
         window.open(urlFinal, '_blank');
     }
 </script>
