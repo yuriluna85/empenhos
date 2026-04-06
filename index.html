@@ -5,21 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Consulta Empenhos DICOM - IF Baiano</title>
     <style>
-        :root { --verde-if: #27ae60; --dark: #2c3e50; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; }
-        .card { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); flex: 1; }
+        :root { --verde-if: #27ae60; --dark: #2c3e50; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); padding: 20px; min-height: 100vh; display: flex; flex-direction: column; }
+        .card { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box; }
         h2 { color: var(--verde-if); border-left: 5px solid var(--verde-if); padding-left: 15px; margin-bottom: 25px; }
         .input-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: 600; }
-        input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        button { background: var(--verde-if); color: white; padding: 14px; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; }
-        #status-box { margin-top: 20px; padding: 15px; border-radius: 8px; display: none; }
-        .loading { background: #d1ecf1; color: #0c5460; }
-        .error { background: #f8d7da; color: #721c24; }
-        table { width: 100%; border-collapse: collapse; margin-top: 25px; display: none; }
-        th, td { padding: 14px; border-bottom: 1px solid #eee; text-align: left; }
-        th { background: var(--verde-if); color: white; }
-        footer { text-align: center; margin-top: 20px; color: #888; font-size: 0.8em; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--dark); }
+        input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; transition: 0.3s; }
+        input:focus { border-color: var(--verde-if); outline: none; box-shadow: 0 0 8px rgba(39, 174, 96, 0.2); }
+        button { background: var(--verde-if); color: white; padding: 14px; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #219150; transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
+        #status-box { margin-top: 20px; padding: 15px; border-radius: 8px; display: none; font-weight: 500; text-align: center; }
+        .loading { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .table-container { margin-top: 25px; overflow-x: auto; display: none; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; }
+        th, td { padding: 14px; border-bottom: 1px solid #eee; text-align: left; font-size: 14px; }
+        th { background: var(--verde-if); color: white; text-transform: uppercase; letter-spacing: 1px; }
+        tr:hover { background: #f9f9f9; }
+        footer { text-align: center; margin-top: auto; padding: 20px; color: #888; font-size: 0.85em; }
     </style>
 </head>
 <body>
@@ -28,100 +33,108 @@
     <h2>🔎 Localizador de Empenhos - DICOM</h2>
     
     <div class="input-group">
-        <label>Chave da API (Token):</label>
-        <input type="password" id="apiKey" placeholder="Insira seu token">
-    </div>
-
-    <div class="input-group">
-        <label>CNPJ do Fornecedor:</label>
+        <label for="cnpjInput">CNPJ do Fornecedor:</label>
         <input type="text" id="cnpjInput" placeholder="00.000.000/0000-00" maxlength="18">
+        <p style="font-size: 0.8em; color: #777; margin-top: 5px;">A consulta será realizada via Cloudflare Worker (Serverless).</p>
     </div>
 
     <button onclick="buscarDados()">Realizar Consulta</button>
 
     <div id="status-box"></div>
 
-    <table id="tabelaDados">
-        <thead>
-            <tr>
-                <th>Data</th>
-                <th>Documento</th>
-                <th>Órgão</th>
-                <th>Valor (R$)</th>
-            </tr>
-        </thead>
-        <tbody id="corpoTabela"></tbody>
-    </table>
+    <div class="table-container" id="tabela-container">
+        <table id="tabelaDados">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Documento</th>
+                    <th>Órgão Superior</th>
+                    <th>Valor (R$)</th>
+                </tr>
+            </thead>
+            <tbody id="corpoTabela"></tbody>
+        </table>
+    </div>
 </div>
 
 <footer>
-    <p>IF Baiano - DICOM | <strong>Versão: 1.1 (Stable)</strong></p>
+    <p>IF Baiano - DICOM | <strong>Versão: 1.2 (Serverless Cloudflare)</strong></p>
 </footer>
 
 <script>
-    // Máscara de CNPJ
-    document.getElementById('cnpjInput').addEventListener('input', (e) => {
+    const cnpjInput = document.getElementById('cnpjInput');
+    const workerUrlBase = 'https://sparkling-flower-ab8c.luna-yuri0.workers.dev/';
+
+    // Máscara de CNPJ em tempo real
+    cnpjInput.addEventListener('input', (e) => {
         let v = e.target.value.replace(/\D/g, '');
         if (v.length > 14) v = v.slice(0, 14);
+        
+        // Aplicação da máscara 00.000.000/0000-00
         v = v.replace(/^(\d{2})(\d)/, '$1.$2');
         v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
         v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
         v = v.replace(/(\d{4})(\d)/, '$1-$2');
+        
         e.target.value = v;
     });
 
     async function buscarDados() {
-        const key = document.getElementById('apiKey').value.trim();
-        const cnpj = document.getElementById('cnpjInput').value.replace(/\D/g, '');
-        const tabela = document.getElementById('tabelaDados');
-        const corpo = document.getElementById('corpoTabela');
+        const cnpjLimpo = cnpjInput.value.replace(/\D/g, '');
+        const statusBox = document.getElementById('status-box');
+        const tabelaContainer = document.getElementById('tabela-container');
+        const corpoTabela = document.getElementById('corpoTabela');
 
-        if (!key || cnpj.length < 14) {
-            exibirStatus("Erro: Preencha a chave e o CNPJ corretamente.", "error");
+        // Validação básica
+        if (cnpjLimpo.length < 14) {
+            exibirStatus("⚠️ Por favor, insira um CNPJ válido com 14 dígitos.", "error");
             return;
         }
 
-        exibirStatus("⏳ Consultando Portal... Se demorar, verifique o Proxy.", "loading");
-        tabela.style.display = "none";
-        corpo.innerHTML = "";
-
-        // Proxy CORS (Atenção: Requer ativação em https://cors-anywhere.herokuapp.com/corsdemo)
-        const url = `https://cors-anywhere.herokuapp.com/https://api.portaldatransparencia.gov.br/api-de-dados/despesas/documentos-por-favorecido?codigoBeneficiario=${cnpj}&pagina=1`;
+        // Reset de interface
+        exibirStatus("⏳ Consultando nuvem Cloudflare... Aguarde.", "loading");
+        tabelaContainer.style.display = "none";
+        corpoTabela.innerHTML = "";
 
         try {
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'chave-api-dados': key,
-                    'Accept': 'application/json'
-                }
-            });
+            // Chamada ao seu Worker passando o CNPJ limpo como parâmetro
+            const response = await fetch(`${workerUrlBase}?cnpj=${cnpjLimpo}`);
 
-            if (response.status === 403) throw new Error("Acesso 403: Ative o proxy no link cors-anywhere.");
-            if (!response.ok) throw new Error(`Erro ${response.status}: Verifique sua chave.`);
+            if (!response.ok) {
+                const erroTexto = await response.text();
+                throw new Error(erroTexto || `Erro ${response.status} no servidor.`);
+            }
 
             const dados = await response.json();
 
             if (!dados || dados.length === 0) {
-                exibirStatus("Nenhum empenho encontrado.", "loading");
+                exibirStatus("ℹ️ Nenhum empenho encontrado para este fornecedor.", "loading");
                 return;
             }
 
+            // Preenchimento da tabela
             dados.forEach(item => {
-                const valor = parseFloat(item.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                corpo.innerHTML += `<tr>
+                const valorFormatado = parseFloat(item.valor).toLocaleString('pt-BR', { 
+                    style: 'currency', 
+                    currency: 'BRL' 
+                });
+                
+                const linha = `<tr>
                     <td>${item.dataEmissao}</td>
                     <td>${item.documento}</td>
                     <td>${item.orgaoSuperior.nome}</td>
-                    <td>${valor}</td>
+                    <td>${valorFormatado}</td>
                 </tr>`;
+                corpoTabela.innerHTML += linha;
             });
 
-            document.getElementById('status-box').style.display = "none";
-            tabela.style.display = "table";
+            // Sucesso
+            statusBox.style.display = "none";
+            tabelaContainer.style.display = "block";
 
         } catch (err) {
-            exibirStatus(`⚠️ ${err.message}`, "error");
+            exibirStatus(`❌ Erro na consulta: ${err.message}`, "error");
+            console.error("Detalhes do erro:", err);
         }
     }
 
@@ -132,5 +145,6 @@
         sBox.style.display = "block";
     }
 </script>
+
 </body>
 </html>
