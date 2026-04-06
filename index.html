@@ -3,66 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consulta Empenhos DICOM - IF Baiano</title>
+    <title>Radar de Aquisições DICOM - IF Baiano</title>
     <style>
         :root { --verde-if: #27ae60; --dark: #2c3e50; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); padding: 20px; min-height: 100vh; display: flex; flex-direction: column; }
-        .card { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box; }
-        h2 { color: var(--verde-if); border-left: 5px solid var(--verde-if); padding-left: 15px; margin-bottom: 25px; }
-        .input-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--dark); }
-        input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; transition: 0.3s; }
-        input:focus { border-color: var(--verde-if); outline: none; box-shadow: 0 0 8px rgba(39, 174, 96, 0.2); }
-        button { background: var(--verde-if); color: white; padding: 14px; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; transition: 0.3s; }
-        button:hover { background: #219150; transform: translateY(-1px); }
-        #status-box { margin-top: 20px; padding: 15px; border-radius: 8px; display: none; font-weight: 500; text-align: center; }
-        .loading { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
-        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .table-container { margin-top: 25px; overflow-x: auto; display: none; }
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; }
-        th, td { padding: 14px; border-bottom: 1px solid #eee; text-align: left; font-size: 14px; }
-        th { background: var(--verde-if); color: white; text-transform: uppercase; letter-spacing: 1px; }
-        tr:hover { background: #f9f9f9; }
-        footer { text-align: center; margin-top: auto; padding: 20px; color: #888; font-size: 0.85em; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: var(--bg); 
+            margin: 0;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+        }
+        .card { 
+            max-width: 450px; 
+            width: 90%;
+            background: white; 
+            padding: 40px; 
+            border-radius: 20px; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1); 
+            text-align: center; 
+            border-bottom: 10px solid var(--verde-if); 
+        }
+        h2 { color: var(--dark); margin-top: 0; font-size: 1.5em; }
+        p { color: #666; font-size: 0.95em; margin-bottom: 30px; }
+        
+        .input-group { margin-bottom: 25px; text-align: left; }
+        label { font-weight: 600; display: block; margin-bottom: 10px; color: var(--dark); }
+        
+        input { 
+            width: 100%; 
+            padding: 18px; 
+            border: 2px solid #e0e0e0; 
+            border-radius: 12px; 
+            font-size: 20px; 
+            box-sizing: border-box; 
+            text-align: center; 
+            font-weight: bold; 
+            color: var(--verde-if);
+            transition: 0.3s;
+        }
+        input:focus { border-color: var(--verde-if); outline: none; background: #f9fffb; }
+        
+        .btn { 
+            background: var(--verde-if); 
+            color: white; 
+            padding: 18px; 
+            border: none; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            width: 100%; 
+            font-size: 18px; 
+            font-weight: bold; 
+            transition: 0.3s; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .btn:hover { background: #219150; transform: translateY(-3px); box-shadow: 0 8px 20px rgba(39, 174, 96, 0.3); }
+        .btn:active { transform: translateY(0); }
+
+        .footer { margin-top: 40px; color: #999; font-size: 0.8em; text-align: center; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>🔎 Localizador de Empenhos - DICOM</h2>
+    <div style="font-size: 50px; margin-bottom: 10px;">🔍</div>
+    <h2>Consulta de Empenhos</h2>
+    <p>Acesse os dados oficiais do Portal da Transparência para o fornecedor desejado.</p>
     
     <div class="input-group">
-        <label for="cnpjInput">CNPJ do Fornecedor:</label>
+        <label>CNPJ do Fornecedor:</label>
         <input type="text" id="cnpjInput" placeholder="00.000.000/0000-00" maxlength="18">
     </div>
 
-    <button onclick="buscarDados()">Realizar Consulta</button>
-
-    <div id="status-box"></div>
-
-    <div class="table-container" id="tabela-container">
-        <table id="tabelaDados">
-            <thead>
-                <tr>
-                    <th>Data</th>
-                    <th>Documento</th>
-                    <th>Órgão Superior</th>
-                    <th>Valor (R$)</th>
-                </tr>
-            </thead>
-            <tbody id="corpoTabela"></tbody>
-        </table>
-    </div>
+    <button onclick="gerarLink()" class="btn">
+        <span>Acessar Portal Oficial</span>
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+    </button>
 </div>
 
-<footer>
-    <p>IF Baiano - DICOM | <strong>Versão: 1.7 (Protocol Fix)</strong></p>
-</footer>
+<div class="footer">
+    IF Baiano - DICOM | <strong>Versão: 2.1 (URL Direct Engine)</strong>
+</div>
 
 <script>
     const cnpjInput = document.getElementById('cnpjInput');
-    const workerUrlBase = 'https://sparkling-flower-ab8c.luna-yuri0.workers.dev/';
 
+    // Máscara CNPJ (Apenas visual para o usuário)
     cnpjInput.addEventListener('input', (e) => {
         let v = e.target.value.replace(/\D/g, '');
         if (v.length > 14) v = v.slice(0, 14);
@@ -73,68 +104,22 @@
         e.target.value = v;
     });
 
-    async function buscarDados() {
-        const cnpjLimpo = cnpjInput.value.replace(/\D/g, '');
-        const statusBox = document.getElementById('status-box');
-        const tabelaContainer = document.getElementById('tabela-container');
-        const corpoTabela = document.getElementById('corpoTabela');
+    function gerarLink() {
+        const cnpjFormatado = cnpjInput.value;
 
-        if (cnpjLimpo.length < 14) {
-            exibirStatus("⚠️ CNPJ incompleto.", "error");
+        if (cnpjFormatado.length < 18) {
+            alert("⚠️ Por favor, digite o CNPJ completo com 14 dígitos.");
             return;
         }
 
-        exibirStatus("⏳ Consultando via Worker (Protocol V1.7)...", "loading");
-        tabelaContainer.style.display = "none";
-        corpoTabela.innerHTML = "";
+        // Encodamos o CNPJ (Ex: 34.239.740/0001-05 vira 34.239.740%2F0001-05)
+        const cnpjEncoded = encodeURIComponent(cnpjFormatado);
 
-        try {
-            const response = await fetch(`${workerUrlBase}?cnpj=${cnpjLimpo}`);
-            const dados = await response.json();
+        // Link Final baseado na estrutura real que você validou
+        const urlFinal = `https://portaldatransparencia.gov.br/despesas/recursos-recebidos?paginacaoSimples=true&tamanhoPagina=&offset=&direcaoOrdenacao=asc&cpfCnpj=${cnpjEncoded}&colunasSelecionadas=linkDetalhamento%2CmesAno%2Cfavorecido%2CtipoFavorecido%2CufFavorecido%2CmunicipioFavorecido%2CvalorRecebido`;
 
-            if (!response.ok) {
-                // Tenta extrair a mensagem de erro específica do Portal
-                let msg = dados.message || dados.error || `Erro ${response.status}`;
-                throw new Error(msg);
-            }
-
-            if (!Array.isArray(dados)) {
-                throw new Error("Formato de lista não recebido.");
-            }
-
-            if (dados.length === 0) {
-                exibirStatus("ℹ️ Nenhum empenho encontrado (2025-2026).", "loading");
-                return;
-            }
-
-            dados.forEach(item => {
-                const valorFormatado = parseFloat(item.valor).toLocaleString('pt-BR', { 
-                    style: 'currency', 
-                    currency: 'BRL' 
-                });
-                
-                corpoTabela.innerHTML += `<tr>
-                    <td>${item.dataEmissao}</td>
-                    <td>${item.documento}</td>
-                    <td>${item.orgaoSuperior ? item.orgaoSuperior.nome : 'N/A'}</td>
-                    <td>${valorFormatado}</td>
-                </tr>`;
-            });
-
-            statusBox.style.display = "none";
-            tabelaContainer.style.display = "block";
-
-        } catch (err) {
-            exibirStatus(`❌ Detalhes: ${err.message}`, "error");
-            console.error("Debug:", err);
-        }
-    }
-
-    function exibirStatus(msg, classe) {
-        const sBox = document.getElementById('status-box');
-        sBox.innerHTML = msg;
-        sBox.className = classe;
-        sBox.style.display = "block";
+        // Abre o Portal da Transparência em uma nova aba
+        window.open(urlFinal, '_blank');
     }
 </script>
 
