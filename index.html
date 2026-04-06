@@ -1,145 +1,50 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consulta Empenhos DICOM - IF Baiano</title>
-    <style>
-        :root { --verde-if: #27ae60; --dark: #2c3e50; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); padding: 20px; min-height: 100vh; display: flex; flex-direction: column; }
-        .card { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box; }
-        h2 { color: var(--verde-if); border-left: 5px solid var(--verde-if); padding-left: 15px; margin-bottom: 25px; }
-        .input-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--dark); }
-        input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; transition: 0.3s; }
-        input:focus { border-color: var(--verde-if); outline: none; box-shadow: 0 0 8px rgba(39, 174, 96, 0.2); }
-        button { background: var(--verde-if); color: white; padding: 14px; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; transition: 0.3s; }
-        button:hover { background: #219150; transform: translateY(-1px); }
-        #status-box { margin-top: 20px; padding: 15px; border-radius: 8px; display: none; font-weight: 500; text-align: center; }
-        .loading { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
-        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .table-container { margin-top: 25px; overflow-x: auto; display: none; }
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; }
-        th, td { padding: 14px; border-bottom: 1px solid #eee; text-align: left; font-size: 14px; }
-        th { background: var(--verde-if); color: white; text-transform: uppercase; letter-spacing: 1px; }
-        tr:hover { background: #f9f9f9; }
-        footer { text-align: center; margin-top: auto; padding: 20px; color: #888; font-size: 0.85em; }
-    </style>
-</head>
-<body>
-
-<div class="card">
-    <h2>🔎 Localizador de Empenhos - DICOM</h2>
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const cnpj = url.searchParams.get("cnpj");
     
-    <div class="input-group">
-        <label for="cnpjInput">CNPJ do Fornecedor:</label>
-        <input type="text" id="cnpjInput" placeholder="00.000.000/0000-00" maxlength="18">
-    </div>
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, chave-api-dados",
+    };
 
-    <button onclick="buscarDados()">Realizar Consulta</button>
+    if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+    if (!cnpj) return new Response(JSON.stringify({ error: "CNPJ ausente" }), { status: 400, headers: corsHeaders });
 
-    <div id="status-box"></div>
+    // Gerar datas (Portal exige DD/MM/AAAA)
+    const hoje = new Date();
+    const umAnoAtras = new Date();
+    umAnoAtras.setFullYear(hoje.getFullYear() - 1);
 
-    <div class="table-container" id="tabela-container">
-        <table id="tabelaDados">
-            <thead>
-                <tr>
-                    <th>Data</th>
-                    <th>Documento</th>
-                    <th>Órgão Superior</th>
-                    <th>Valor (R$)</th>
-                </tr>
-            </thead>
-            <tbody id="corpoTabela"></tbody>
-        </table>
-    </div>
-</div>
+    const fmtData = (d) => d.toLocaleDateString('pt-BR');
+    
+    const dataInicial = fmtData(umAnoAtras);
+    const dataFinal = fmtData(hoje);
 
-<footer>
-    <p>IF Baiano - DICOM | <strong>Versão: 1.5 (Final Patch)</strong></p>
-</footer>
+    // Montando a URL com o filtro de data obrigatório
+    const apiUrl = `https://api.portaldatransparencia.gov.br/api-de-dados/despesas/documentos-por-favorecido?codigoBeneficiario=${cnpj}&dataInicial=${dataInicial}&dataFinal=${dataFinal}&pagina=1`;
 
-<script>
-    const cnpjInput = document.getElementById('cnpjInput');
-    const workerUrlBase = 'https://sparkling-flower-ab8c.luna-yuri0.workers.dev/';
-
-    cnpjInput.addEventListener('input', (e) => {
-        let v = e.target.value.replace(/\D/g, '');
-        if (v.length > 14) v = v.slice(0, 14);
-        v = v.replace(/^(\d{2})(\d)/, '$1.$2');
-        v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
-        v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
-        v = v.replace(/(\d{4})(\d)/, '$1-$2');
-        e.target.value = v;
-    });
-
-    async function buscarDados() {
-        const cnpjLimpo = cnpjInput.value.replace(/\D/g, '');
-        const statusBox = document.getElementById('status-box');
-        const tabelaContainer = document.getElementById('tabela-container');
-        const corpoTabela = document.getElementById('corpoTabela');
-
-        if (cnpjLimpo.length < 14) {
-            exibirStatus("⚠️ CNPJ incompleto.", "error");
-            return;
+    try {
+      const response = await fetch(apiUrl, {
+        method: "GET",
+        headers: {
+          "chave-api-dados": env.CHAVE_PORTAL,
+          "Accept": "application/json"
         }
+      });
 
-        exibirStatus("⏳ Consultando nuvem Cloudflare...", "loading");
-        tabelaContainer.style.display = "none";
-        corpoTabela.innerHTML = "";
+      const data = await response.json();
 
-        try {
-            const response = await fetch(`${workerUrlBase}?cnpj=${cnpjLimpo}`);
-            
-            // Se for 400, o problema é a montagem da URL ou parâmetro
-            if (response.status === 400) {
-                throw new Error("Erro 400: Requisição malformada. Verifique o CNPJ.");
-            }
-            if (response.status === 401) {
-                throw new Error("Erro 401: Chave de API inválida no Worker.");
-            }
-
-            const dados = await response.json();
-
-            if (!Array.isArray(dados)) {
-                throw new Error(dados.message || dados.error || "A API retornou um formato inesperado.");
-            }
-
-            if (dados.length === 0) {
-                exibirStatus("ℹ️ Nenhum empenho encontrado para este CNPJ.", "loading");
-                return;
-            }
-
-            dados.forEach(item => {
-                const valorFormatado = parseFloat(item.valor).toLocaleString('pt-BR', { 
-                    style: 'currency', 
-                    currency: 'BRL' 
-                });
-                
-                corpoTabela.innerHTML += `<tr>
-                    <td>${item.dataEmissao}</td>
-                    <td>${item.documento}</td>
-                    <td>${item.orgaoSuperior ? item.orgaoSuperior.nome : 'N/A'}</td>
-                    <td>${valorFormatado}</td>
-                </tr>`;
-            });
-
-            statusBox.style.display = "none";
-            tabelaContainer.style.display = "block";
-
-        } catch (err) {
-            exibirStatus(`❌ Erro: ${err.message}`, "error");
-            console.error("Detalhes do erro:", err);
-        }
+      return new Response(JSON.stringify(data), {
+        status: response.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Erro de conexão", details: err.message }), { 
+        status: 500, 
+        headers: corsHeaders 
+      });
     }
-
-    function exibirStatus(msg, classe) {
-        const sBox = document.getElementById('status-box');
-        sBox.innerHTML = msg;
-        sBox.className = classe;
-        sBox.style.display = "block";
-    }
-</script>
-
-</body>
-</html>
+  }
+};
