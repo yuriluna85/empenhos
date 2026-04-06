@@ -56,14 +56,13 @@
 </div>
 
 <footer>
-    <p>IF Baiano - DICOM | <strong>Versão: 1.4 (Portal Compliance)</strong></p>
+    <p>IF Baiano - DICOM | <strong>Versão: 1.5 (Final Patch)</strong></p>
 </footer>
 
 <script>
     const cnpjInput = document.getElementById('cnpjInput');
     const workerUrlBase = 'https://sparkling-flower-ab8c.luna-yuri0.workers.dev/';
 
-    // Máscara CNPJ
     cnpjInput.addEventListener('input', (e) => {
         let v = e.target.value.replace(/\D/g, '');
         if (v.length > 14) v = v.slice(0, 14);
@@ -85,23 +84,25 @@
             return;
         }
 
-        exibirStatus("⏳ Consultando Cloudflare Worker...", "loading");
+        exibirStatus("⏳ Consultando nuvem Cloudflare...", "loading");
         tabelaContainer.style.display = "none";
         corpoTabela.innerHTML = "";
 
         try {
             const response = await fetch(`${workerUrlBase}?cnpj=${cnpjLimpo}`);
-            const dados = await response.json();
-
+            
+            // Se for 400, o problema é a montagem da URL ou parâmetro
+            if (response.status === 400) {
+                throw new Error("Erro 400: Requisição malformada. Verifique o CNPJ.");
+            }
             if (response.status === 401) {
-                throw new Error("Chave de API Recusada pelo Portal (401). Verifique o Token no Cloudflare.");
+                throw new Error("Erro 401: Chave de API inválida no Worker.");
             }
 
+            const dados = await response.json();
+
             if (!Array.isArray(dados)) {
-                let msg = "Resposta inválida do servidor.";
-                if (dados.message) msg = dados.message;
-                if (dados.error) msg = dados.error;
-                throw new Error(msg);
+                throw new Error(dados.message || dados.error || "A API retornou um formato inesperado.");
             }
 
             if (dados.length === 0) {
@@ -127,8 +128,8 @@
             tabelaContainer.style.display = "block";
 
         } catch (err) {
-            exibirStatus(`❌ ${err.message}`, "error");
-            console.error("Erro capturado:", err);
+            exibirStatus(`❌ Erro: ${err.message}`, "error");
+            console.error("Detalhes do erro:", err);
         }
     }
 
